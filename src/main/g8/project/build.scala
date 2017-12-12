@@ -3,7 +3,7 @@ import Keys._
 
 import android.Keys._
 import android.Plugin.androidBuild
-import sbtrobovm.RobovmPlugin._
+//import sbtrobovm.RobovmPlugin._
 
 object Settings {
   import LibgdxBuild.libgdxVersion
@@ -14,12 +14,14 @@ object Settings {
 
   lazy val desktopJarName = SettingKey[String]("desktop-jar-name", "name of JAR file for desktop")
 
+
   lazy val core = plugins.JvmPlugin.projectSettings ++ Seq(
     version := (version in LocalProject("all-platforms")).value,
     libgdxVersion := (libgdxVersion in LocalProject("all-platforms")).value,
     scalaVersion := (scalaVersion in LocalProject("all-platforms")).value,
     libraryDependencies ++= Seq(
-      "com.badlogicgames.gdx" % "gdx" % libgdxVersion.value
+      "com.badlogicgames.gdx" % "gdx" % libgdxVersion.value,
+      "org.scala-lang" % "scala-reflect" % "2.11.8"
     ),
     javacOptions ++= Seq(
       "-Xlint",
@@ -46,13 +48,13 @@ object Settings {
 
   lazy val desktop = core ++ Seq(
     libraryDependencies ++= Seq(
-      "net.sf.proguard" % "proguard-base" % "4.11" % "provided",
+      "net.sf.proguard" % "proguard-base" % "5.2.1" % "provided",
       "com.badlogicgames.gdx" % "gdx-backend-lwjgl" % libgdxVersion.value,
       "com.badlogicgames.gdx" % "gdx-platform" % libgdxVersion.value classifier "natives-desktop"
     ),
     fork in Compile := true,
     unmanagedResourceDirectories in Compile += file("android/assets"),
-    desktopJarName := "$name;format="norm"$",
+    desktopJarName := "zad1libgdx",
     Tasks.assembly
   )
 
@@ -68,27 +70,9 @@ object Settings {
       ("natives-armeabi-v7a.jar", new ExactFilter("libgdx.so"), base / "libs" / "armeabi-v7a"),
       ("natives-x86.jar", new ExactFilter("libgdx.so"), base / "libs" / "x86")
     )},
-    platformTarget in Android := "android-$api_level$",
+    platformTarget in Android := "android-21",
     proguardOptions in Android ++= scala.io.Source.fromFile(file("core/proguard-project.txt")).getLines.toList ++
                                    scala.io.Source.fromFile(file("android/proguard-project.txt")).getLines.toList
-  )
-
-  lazy val ios = core ++ Tasks.natives ++ Seq(
-    unmanagedResources in Compile <++= (baseDirectory) map { _ =>
-      (file("android/assets") ** "*").get
-    },
-    forceLinkClasses := Seq("com.badlogic.gdx.scenes.scene2d.ui.*"),
-    skipPngCrush := true,
-    iosInfoPlist <<= (sourceDirectory in Compile){ sd => Some(sd / "Info.plist") },
-    frameworks := Seq("UIKit", "OpenGLES", "QuartzCore", "CoreGraphics", "OpenAL", "AudioToolbox", "AVFoundation"),
-    nativePath <<= (baseDirectory){ bd => Seq(bd / "lib") },
-    libraryDependencies ++= Seq(
-      "com.badlogicgames.gdx" % "gdx-backend-robovm" % libgdxVersion.value,
-      "com.badlogicgames.gdx" % "gdx-platform" % libgdxVersion.value % "natives" classifier "natives-ios"
-    ),
-    nativeExtractions <<= (baseDirectory) { base => Seq(
-      ("natives-ios.jar", new ExactFilter("libgdx.a") | new ExactFilter("libObjectAL.a"), base / "lib")
-    )}
   )
 }
 
@@ -154,13 +138,14 @@ object Tasks {
 }
 
 object LibgdxBuild extends Build {
-  lazy val libgdxVersion = settingKey[String]("version of Libgdx library")
+  lazy val openStructProject = RootProject(uri("https://github.com/SzymonSwistun94/ScalaOpenStruct.git" ))
 
+  lazy val libgdxVersion = settingKey[String]("version of Libgdx library")
   lazy val core = Project(
     id       = "core",
     base     = file("core"),
     settings = Settings.core
-  )
+  ) dependsOn openStructProject
 
   lazy val desktop = Project(
     id       = "desktop",
@@ -174,16 +159,11 @@ object LibgdxBuild extends Build {
     settings = Settings.android
   ).dependsOn(core)
 
-  lazy val ios = RobovmProject(
-    id       = "ios",
-    base     = file("ios"),
-    settings = Settings.ios
-  ).dependsOn(core)
-
   lazy val all = Project(
     id       = "all-platforms",
     base     = file("."),
     settings = Settings.core
-  ).aggregate(core, desktop, android, ios)
+  //).aggregate(core, desktop, android, ios)
+  ).aggregate(core, desktop, android)
 }
 
